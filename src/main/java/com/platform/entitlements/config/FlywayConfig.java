@@ -2,6 +2,7 @@ package com.platform.entitlements.config;
 
 import org.flywaydb.core.Flyway;
 import org.springframework.boot.autoconfigure.flyway.FlywayProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,6 +23,12 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class FlywayConfig {
+
+    @Bean
+    @ConfigurationProperties("spring.flyway")
+    public FlywayProperties flywayProperties() {
+        return new FlywayProperties();
+    }
 
     @Bean(initMethod = "migrate")
     public Flyway flyway(FlywayProperties flywayProperties) {
