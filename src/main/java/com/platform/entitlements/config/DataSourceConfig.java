@@ -18,6 +18,7 @@ public class DataSourceConfig {
      * DataSource bean yet — we need to wrap the real one below.
      */
     @Bean
+    @Primary
     @ConfigurationProperties("spring.datasource")
     public DataSourceProperties dataSourceProperties() {
         return new DataSourceProperties();
