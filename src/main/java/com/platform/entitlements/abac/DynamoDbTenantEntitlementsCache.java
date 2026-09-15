@@ -8,6 +8,9 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.DeleteItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.PutItemEnhancedRequest;
+import software.amazon.awssdk.core.exception.SdkException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -35,6 +38,7 @@ import java.util.UUID;
 public class DynamoDbTenantEntitlementsCache implements TenantEntitlementsCache {
 
     private static final Duration TTL = Duration.ofMinutes(5);
+    private static final Logger log = LoggerFactory.getLogger(DynamoDbTenantEntitlementsCache.class);
 
     private final DynamoDbTable<TenantEntitlementsItem> table;
 
@@ -46,10 +50,15 @@ public class DynamoDbTenantEntitlementsCache implements TenantEntitlementsCache 
 
     @Override
     public Optional<SubscriptionTier> get(UUID tenantId) {
-        TenantEntitlementsItem item = table.getItem(keyItem(tenantId));
-        return item == null
-                ? Optional.empty()
-                : Optional.of(SubscriptionTier.fromString(item.getSubscriptionTier()));
+        try {
+            TenantEntitlementsItem item = table.getItem(keyItem(tenantId));
+            return item == null
+                    ? Optional.empty()
+                    : Optional.of(SubscriptionTier.fromString(item.getSubscriptionTier()));
+        } catch (SdkException e) {
+            log.warn("DynamoDB cache unavailable; falling back to Postgres for tenant {}", tenantId);
+            return Optional.empty();
+        }
     }
 
     @Override
@@ -58,12 +67,20 @@ public class DynamoDbTenantEntitlementsCache implements TenantEntitlementsCache 
         item.setTenantId(tenantId.toString());
         item.setSubscriptionTier(tier.name());
         item.setExpiresAt(Instant.now().plus(TTL).getEpochSecond());
-        table.putItem(PutItemEnhancedRequest.builder(TenantEntitlementsItem.class).item(item).build());
+        try {
+            table.putItem(PutItemEnhancedRequest.builder(TenantEntitlementsItem.class).item(item).build());
+        } catch (SdkException e) {
+            log.warn("DynamoDB cache unavailable; tier was not cached for tenant {}", tenantId);
+        }
     }
 
     @Override
     public void evict(UUID tenantId) {
-        table.deleteItem(DeleteItemEnhancedRequest.builder().key(k -> k.partitionValue(tenantId.toString())).build());
+        try {
+            table.deleteItem(DeleteItemEnhancedRequest.builder().key(k -> k.partitionValue(tenantId.toString())).build());
+        } catch (SdkException e) {
+            log.warn("DynamoDB cache unavailable; tier cache was not evicted for tenant {}", tenantId);
+        }
     }
 
     private TenantEntitlementsItem keyItem(UUID tenantId) {
