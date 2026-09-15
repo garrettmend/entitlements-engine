@@ -63,7 +63,7 @@ public class ReportController {
         report.setTenantId(UUID.fromString(TenantContext.getTenantId()));
         report.setTitle(request.title());
         report.setBody(request.body());
-        report.setCreatedBy(authentication.getName());
+        report.setCreatedBy(authentication == null ? "api-user" : authentication.getName());
         return reportRepository.save(report);
     }
 
