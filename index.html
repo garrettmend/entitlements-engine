@@ -121,11 +121,22 @@
       <label for="baseUrl">API base URL</label>
       <input type="text" id="baseUrl" class="mono" value="https://entitlements-engine-production.up.railway.app">
     </div>
+    <div class="field">
+      <label for="cognitoClientId">Cognito public app client ID</label>
+      <input type="text" id="cognitoClientId" class="mono" placeholder="Paste public client ID">
+    </div>
     <div class="field wide">
-      <label for="token">Access token (paste a Cognito JWT)</label>
+      <label for="token">Access token</label>
       <textarea id="token" placeholder="eyJraWQiOi..."></textarea>
       <div class="claims-line" id="claimsLine">No token yet.</div>
     </div>
+  </div>
+  <div class="identity-row">
+    <div class="btn-row" style="margin:0;">
+      <button class="primary" id="signInBtn" type="button">Sign in with Cognito</button>
+      <button class="quiet" id="signOutBtn" type="button">Sign out</button>
+    </div>
+    <div class="claims-line" id="authLine">Use a public Cognito app client for browser sign-in.</div>
   </div>
 </div>
 
@@ -339,6 +350,71 @@
     return true;
   }
 
+  // ---------- Cognito browser login (Authorization Code + PKCE) ----------
+  const cognitoDomain = "https://us-east-1gjuwrqzas.auth.us-east-1.amazoncognito.com";
+  const cognitoClientIdInput = document.getElementById("cognitoClientId");
+  const authLine = document.getElementById("authLine");
+  const redirectUri = window.location.origin + window.location.pathname;
+
+  function base64Url(bytes){
+    let binary = "";
+    bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  function randomString(length){
+    const bytes = new Uint8Array(length);
+    crypto.getRandomValues(bytes);
+    return base64Url(bytes);
+  }
+
+  async function sha256Base64Url(value){
+    const data = new TextEncoder().encode(value);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+    return base64Url(new Uint8Array(digest));
+  }
+
+  function saveToken(token){
+    tokenInput.value = token;
+    tokenInput.dispatchEvent(new Event("input"));
+    authLine.textContent = "Signed in. The access token is ready for API calls.";
+  }
+
+  async function handleCognitoCallback(){
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) return;
+
+    const verifier = sessionStorage.getItem("cognito_code_verifier");
+    const clientId = cognitoClientIdInput.value.trim() || localStorage.getItem("cognito_client_id");
+    if (!verifier || !clientId){
+      authLine.textContent = "Login callback received, but the public client ID or PKCE verifier is missing.";
+      return;
+    }
+
+    authLine.textContent = "Completing Cognito sign-in...";
+    const response = await fetch(cognitoDomain + "/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: clientId,
+        code: code,
+        redirect_uri: redirectUri,
+        code_verifier: verifier,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.access_token){
+      authLine.textContent = "Cognito sign-in failed: " + (result.error_description || result.error || "token exchange failed");
+      return;
+    }
+
+    sessionStorage.removeItem("cognito_code_verifier");
+    saveToken(result.access_token);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
   // ---------- Identity bar ----------
   const tokenInput = document.getElementById("token");
   const claimsLine = document.getElementById("claimsLine");
@@ -346,6 +422,42 @@
   tokenInput.addEventListener("input", () => {
     const info = renderClaims(tokenInput.value.trim(), claimsLine);
     liveDot.classList.toggle("live", !!(info && !info.expired));
+  });
+
+  const storedClientId = localStorage.getItem("cognito_client_id");
+  if (storedClientId) cognitoClientIdInput.value = storedClientId;
+
+  document.getElementById("signInBtn").addEventListener("click", async () => {
+    const clientId = cognitoClientIdInput.value.trim();
+    if (!clientId){
+      authLine.textContent = "Enter the public Cognito app client ID first.";
+      cognitoClientIdInput.focus();
+      return;
+    }
+    localStorage.setItem("cognito_client_id", clientId);
+    const verifier = randomString(64);
+    sessionStorage.setItem("cognito_code_verifier", verifier);
+    const challenge = await sha256Base64Url(verifier);
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: "openid email",
+      code_challenge_method: "S256",
+      code_challenge: challenge,
+    });
+    window.location.assign(cognitoDomain + "/oauth2/authorize?" + params);
+  });
+
+  document.getElementById("signOutBtn").addEventListener("click", () => {
+    tokenInput.value = "";
+    tokenInput.dispatchEvent(new Event("input"));
+    sessionStorage.removeItem("cognito_code_verifier");
+    authLine.textContent = "Signed out locally.";
+  });
+
+  handleCognitoCallback().catch(error => {
+    authLine.textContent = "Cognito sign-in failed: " + error.message;
   });
 
   // ---------- Tenant isolation ----------
