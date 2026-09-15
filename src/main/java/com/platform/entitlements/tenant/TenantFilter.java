@@ -70,12 +70,14 @@ public class TenantFilter extends OncePerRequestFilter {
         // Public/health endpoints and unauthenticated paths don't need a
         // tenant. Keep this in sync with SecurityConfig's permitAll() list.
         String path = request.getRequestURI();
-        return !(path.startsWith("/actuator") || path.startsWith("/health"));
+        return !(path.equals("/") || path.equals("/index.html")
+            || path.startsWith("/actuator") || path.startsWith("/health"));
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/actuator") || path.startsWith("/health");
+        return path.equals("/") || path.equals("/index.html")
+            || path.startsWith("/actuator") || path.startsWith("/health");
     }
 }

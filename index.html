@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entitlements Engine — Control Plane (Live)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12151C; --panel:#1B2129; --panel-raised:#212933; --line:#2A2F3A;
+    --text:#E8E6E1; --muted:#8B93A3; --amber:#E8A33D; --amber-dim:#4A3A22;
+    --green:#5FB88A; --green-dim:#233229; --rust:#D9634F; --rust-dim:#3A2320;
+    --radius:3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--ink); color:var(--text); font-family:'IBM Plex Sans',-apple-system,sans-serif; font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;}
+  code, .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;}
+  a{color:var(--amber);}
+
+  .identity-bar{position:sticky; top:0; z-index:10; background:var(--panel); border-bottom:1px solid var(--line); padding:16px 28px;}
+  .identity-row{display:flex; align-items:flex-end; gap:20px; flex-wrap:wrap; max-width:920px; margin:0 auto;}
+  .brand{font-weight:600; display:flex; align-items:center; gap:8px; margin-bottom:12px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);}
+  .dot.live{background:var(--green); box-shadow:0 0 0 3px var(--green-dim);}
+  .field{display:flex; flex-direction:column; gap:4px; flex:1; min-width:200px;}
+  .field.wide{flex:2; min-width:320px;}
+  .field label{font-size:11.5px; color:var(--muted);}
+  select, input[type="number"], input[type="text"], textarea{
+    background:var(--panel-raised); border:1px solid var(--line); color:var(--text);
+    padding:8px 10px; border-radius:var(--radius); font-family:inherit; font-size:14px; width:100%;
+  }
+  textarea{font-family:'IBM Plex Mono',monospace; font-size:12.5px; resize:vertical; min-height:44px;}
+  select:focus, input:focus, textarea:focus, button:focus{outline:2px solid var(--amber); outline-offset:1px;}
+
+  .claims-line{font-size:12.5px; color:var(--muted); margin-top:6px;}
+  .claims-line .mono{color:var(--text);}
+  .claims-line.error{color:var(--rust);}
+
+  main{max-width:920px; margin:0 auto; padding:36px 28px 80px;}
+  .intro{margin-bottom:44px;}
+  .intro h1{font-size:22px; font-weight:600; margin:0 0 10px;}
+  .intro p{color:var(--muted); max-width:64ch; margin:0 0 14px;}
+  .checklist{border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px;}
+  .checklist .title{font-size:13px; color:var(--muted); margin-bottom:8px;}
+  .checklist ul{margin:0; padding-left:18px; font-size:13.5px; color:var(--muted);}
+  .checklist li{margin-bottom:4px;}
+  .checklist code{color:var(--text);}
+
+  section.panel{margin-bottom:52px;}
+  .panel-head{display:flex; align-items:baseline; justify-content:space-between; border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:18px;}
+  .panel-head h2{font-size:16px; font-weight:600; margin:0;}
+  .panel-head .mechanism{font-size:12.5px; color:var(--muted);}
+
+  .btn-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  button{background:var(--panel-raised); border:1px solid var(--line); color:var(--text); padding:8px 14px; border-radius:var(--radius); cursor:pointer; font-family:inherit; font-size:14px;}
+  button:hover:not(:disabled){border-color:var(--amber);}
+  button:disabled{opacity:0.5; cursor:not-allowed;}
+  button.primary{background:var(--amber); border-color:var(--amber); color:var(--ink); font-weight:500;}
+  button.primary:hover:not(:disabled){opacity:0.9;}
+  button.quiet{color:var(--muted);}
+
+  table{width:100%; border-collapse:collapse; font-size:14px;}
+  th{text-align:left; font-weight:500; color:var(--muted); font-size:12.5px; padding:6px 10px; border-bottom:1px solid var(--line);}
+  td{padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .id{color:var(--muted); font-size:13px;}
+
+  .badge{display:inline-block; padding:2px 8px; border-radius:100px; font-size:12px; font-weight:500;}
+  .badge.allow, .badge.new{background:var(--green-dim); color:var(--green);}
+  .badge.deny{background:var(--rust-dim); color:var(--rust);}
+  .badge.dup{background:var(--panel-raised); color:var(--muted); border:1px solid var(--line);}
+  .badge.pending{background:var(--amber-dim); color:var(--amber);}
+
+  .flash{animation:flash 900ms ease;}
+  @keyframes flash{0%{background:var(--rust-dim);} 100%{background:transparent;}}
+
+  .result-box{
+    margin-top:10px; padding:12px 14px; border:1px solid var(--line); border-radius:var(--radius);
+    font-size:13px; white-space:pre-wrap; word-break:break-word; display:none;
+  }
+  .result-box.show{display:block;}
+  .result-box.ok{border-color:var(--green-dim);}
+  .result-box.err{border-color:var(--rust-dim);}
+  .result-box .status-line{font-weight:600; margin-bottom:6px;}
+  .result-box.ok .status-line{color:var(--green);}
+  .result-box.err .status-line{color:var(--rust);}
+  .result-box .body{color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:12px;}
+  .result-box .hint{margin-top:8px; color:var(--amber); font-family:inherit;}
+
+  .form-row{display:flex; gap:12px; flex-wrap:wrap; align-items:end; margin-bottom:8px;}
+  .form-row .field{min-width:150px;}
+  .form-row .field.grow{flex:1; min-width:220px;}
+  .hint{font-size:12.5px; color:var(--muted); margin:6px 0 18px;}
+
+  .compare-toggle{font-size:13px; color:var(--muted); cursor:pointer; margin-bottom:14px; display:inline-block;}
+  .compare-toggle:hover{color:var(--amber);}
+  .compare-panel{display:none; margin-bottom:18px; padding-top:14px; border-top:1px dashed var(--line);}
+  .compare-panel.show{display:block;}
+  .compare-grid{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
+  @media (max-width:640px){.compare-grid{grid-template-columns:1fr;}}
+  .compare-col h3{font-size:13px; font-weight:600; margin:0 0 8px; color:var(--muted);}
+
+  .ent-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media (max-width:640px){.ent-grid{grid-template-columns:1fr;}}
+  .ent-card{border:1px solid var(--line); border-radius:var(--radius); padding:16px;}
+  .ent-card .perm-name{font-weight:600; margin-bottom:4px;}
+  .ent-card .perm-rule{font-size:12.5px; color:var(--muted); margin-bottom:14px;}
+
+  footer{max-width:920px; margin:0 auto; padding:0 28px 60px; color:var(--muted); font-size:13px; border-top:1px solid var(--line); padding-top:24px;}
+</style>
+</head>
+<body>
+
+<div class="identity-bar">
+  <div class="identity-row">
+    <div class="brand"><span class="dot" id="liveDot"></span>Control Plane — live</div>
+  </div>
+  <div class="identity-row">
+    <div class="field">
+      <label for="baseUrl">API base URL</label>
+      <input type="text" id="baseUrl" class="mono" value="https://entitlements-engine-production.up.railway.app">
+    </div>
+    <div class="field wide">
+      <label for="token">Access token (paste a Cognito JWT)</label>
+      <textarea id="token" placeholder="eyJraWQiOi..."></textarea>
+      <div class="claims-line" id="claimsLine">No token yet.</div>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="intro">
+    <h1>Multi-tenant control plane — wired to the real API</h1>
+    <p>
+      Every action on this page calls the live Spring Boot service on Railway.
+      Nothing here is simulated — a denied action is a real <code class="mono">403</code>
+      from <code class="mono">@PreAuthorize</code>, a blocked duplicate is a real
+      Postgres unique-constraint conflict.
+    </p>
+    <div class="checklist">
+      <div class="title">Before testing, this needs to be true on the deployed database:</div>
+      <ul>
+        <li>A row in <code>tenants</code> whose <code>id</code> matches your token's <code>custom:tenant_id</code> claim</li>
+        <li>For the "Create report" check to succeed: that tenant's <code>subscription_tier</code> is <code>ENTERPRISE</code>, and your user is in the <code>REPORT_WRITER</code> Cognito group</li>
+        <li>For "Export data" to succeed: tier is <code>PRO</code> or <code>ENTERPRISE</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ================= TENANT ISOLATION ================= -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Tenant isolation</h2>
+      <span class="mechanism">GET /reports — enforced by Postgres Row-Level Security</span>
+    </div>
+
+    <div class="btn-row">
+      <button class="primary" id="loadReportsBtn" type="button">Load my reports</button>
+    </div>
+    <table id="reportsTable" style="display:none;">
+      <thead><tr><th>Title</th><th>Created by</th><th>Created</th><th>Row id</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="result-box" id="reportsResult"></div>
+
+    <span class="compare-toggle" id="compareToggle">+ Compare against a second tenant's token</span>
+    <div class="compare-panel" id="comparePanel">
+      <div class="field wide" style="margin-bottom:12px;">
+        <label for="tokenB">Second access token</label>
+        <textarea id="tokenB" placeholder="eyJraWQiOi..."></textarea>
+      </div>
+      <button id="compareBtn" type="button">Load both, side by side</button>
+      <div class="compare-grid" id="compareGrid" style="margin-top:16px;"></div>
+    </div>
+  </section>
+
+  <!-- ================= USAGE METERING ================= -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Usage metering</h2>
+      <span class="mechanism">POST /metering/events — idempotent via a unique constraint</span>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label for="eventType">Event type</label>
+        <select id="eventType">
+          <option>API_CALL</option>
+          <option>REPORT_GENERATED</option>
+          <option>EXPORT_DATA</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="quantity">Quantity</label>
+        <input type="number" id="quantity" value="1" min="1" style="width:80px;">
+      </div>
+      <div class="field grow">
+        <label for="idempotencyKey">Idempotency-Key</label>
+        <input type="text" id="idempotencyKey" class="mono" placeholder="client-generated key">
+      </div>
+      <button id="regenKeyBtn" class="quiet" type="button">New key</button>
+    </div>
+    <div class="hint">Send, then hit "Resend last event" — the real backend returns the same row instead of creating a new one.</div>
+    <div class="btn-row">
+      <button class="primary" id="sendEventBtn" type="button">Send event</button>
+      <button id="retryEventBtn" type="button">Resend last event (simulate retry)</button>
+      <button class="quiet" id="clearLogBtn" type="button">Clear log</button>
+    </div>
+
+    <table id="eventsTable" style="display:none;">
+      <thead><tr><th>Status</th><th>Event</th><th>Qty</th><th>Idempotency-Key</th><th>Event id</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="result-box" id="meteringResult"></div>
+  </section>
+
+  <!-- ================= ABAC ================= -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Entitlements</h2>
+      <span class="mechanism">real @PreAuthorize checks — tier (tenant) + group (user)</span>
+    </div>
+
+    <div class="ent-grid">
+      <div class="ent-card">
+        <div class="perm-name">Create report</div>
+        <div class="perm-rule">POST /reports — requires Enterprise tier and the Report Writer group</div>
+        <div class="btn-row"><button id="tryCreateBtn" type="button">Try it</button></div>
+        <div class="result-box" id="createResult"></div>
+      </div>
+      <div class="ent-card">
+        <div class="perm-name">Export data</div>
+        <div class="perm-rule">GET /reports/export — requires Pro tier or above</div>
+        <div class="btn-row"><button id="tryExportBtn" type="button">Try it</button></div>
+        <div class="result-box" id="exportResult"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Entitlements Engine — a multi-tenant SaaS control plane (Spring Boot, PostgreSQL RLS,
+  idempotent EventBridge metering, custom ABAC method security), deployed on Railway.
+  This page calls the live API directly from your browser.
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  function mono8(){
+    return [...crypto.getRandomValues(new Uint8Array(4))].map(b => b.toString(16).padStart(2,"0")).join("");
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function baseUrl(){
+    return document.getElementById("baseUrl").value.trim().replace(/\/+$/, "");
+  }
+
+  // ---------- JWT decode (display only — NOT verification; the backend
+  // verifies the signature for real, this is purely so the page can show
+  // you what tenant/groups you're about to test as) ----------
+  function decodeJwtPayload(token){
+    const parts = token.split(".");
+    if (parts.length < 2) throw new Error("Doesn't look like a JWT (expected 3 dot-separated parts)");
+    let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    return JSON.parse(decodeURIComponent(atob(b64).split("").map(c =>
+      "%" + c.charCodeAt(0).toString(16).padStart(2, "0")).join("")));
+  }
+
+  function renderClaims(token, targetEl){
+    if (!token){ targetEl.textContent = "No token yet."; targetEl.className = "claims-line"; return null; }
+    try{
+      const claims = decodeJwtPayload(token);
+      const tenantId = claims["custom:tenant_id"] || "(missing custom:tenant_id claim)";
+      const groups = (claims["cognito:groups"] || []).join(", ") || "(none)";
+      const expMs = claims.exp ? claims.exp * 1000 : null;
+      const expired = expMs && expMs < Date.now();
+      targetEl.innerHTML = "tenant: <span class=\"mono\">" + escapeHtml(tenantId) + "</span> &middot; " +
+        "groups: <span class=\"mono\">" + escapeHtml(groups) + "</span> &middot; " +
+        (expired ? "<strong style=\"color:var(--rust)\">expired</strong>" : "valid until " + new Date(expMs).toLocaleTimeString());
+      targetEl.className = "claims-line" + (expired ? " error" : "");
+      return { tenantId: tenantId, expired: expired };
+    } catch(e){
+      targetEl.textContent = "Couldn't decode this token: " + e.message;
+      targetEl.className = "claims-line error";
+      return null;
+    }
+  }
+
+  // ---------- Fetch wrapper ----------
+  async function apiCall(path, options, token){
+    options = options || {};
+    const headers = Object.assign({}, options.headers || {}, {
+      "Authorization": "Bearer " + token,
+    });
+    let response;
+    try{
+      response = await fetch(baseUrl() + path, Object.assign({}, options, { headers: headers }));
+    } catch(networkErr){
+      // A CORS block or DNS/network failure both surface as a generic
+      // "Failed to fetch" in the browser — there's no way to distinguish
+      // them from JS, so the hint below covers both.
+      return {
+        ok:false, status:0, statusText:"Network error",
+        body:null,
+        hint:"Couldn't reach the server. If you just added CORS to SecurityConfig, " +
+             "make sure that change is actually deployed on Railway — this exact " +
+             "failure mode is what an un-redeployed CORS fix looks like from the browser."
+      };
+    }
+    const text = await response.text();
+    let body = text;
+    try { body = JSON.parse(text); } catch(_e) { /* not JSON, keep as text (e.g. CSV, plain error message) */ }
+    return { ok: response.ok, status: response.status, statusText: response.statusText, body: body };
+  }
+
+  function showResult(el, result, okStatusNote){
+    el.classList.add("show");
+    el.classList.toggle("ok", result.ok);
+    el.classList.toggle("err", !result.ok);
+    const statusLine = result.status === 0
+      ? "Request failed"
+      : (result.status + " " + result.statusText) + (result.ok && okStatusNote ? " — " + okStatusNote : "");
+    const bodyText = typeof result.body === "string" ? result.body : JSON.stringify(result.body, null, 2);
+    el.innerHTML = "<div class=\"status-line\">" + escapeHtml(statusLine) + "</div>" +
+      "<div class=\"body\">" + escapeHtml(bodyText || "(empty response body)") + "</div>" +
+      (result.hint ? "<div class=\"hint\">" + escapeHtml(result.hint) + "</div>" : "");
+  }
+
+  function requireToken(tokenValue, resultEl){
+    if (!tokenValue){
+      showResult(resultEl, { ok:false, status:0, statusText:"No token", body:"Paste an access token above first." });
+      return false;
+    }
+    return true;
+  }
+
+  // ---------- Identity bar ----------
+  const tokenInput = document.getElementById("token");
+  const claimsLine = document.getElementById("claimsLine");
+  const liveDot = document.getElementById("liveDot");
+  tokenInput.addEventListener("input", () => {
+    const info = renderClaims(tokenInput.value.trim(), claimsLine);
+    liveDot.classList.toggle("live", !!(info && !info.expired));
+  });
+
+  // ---------- Tenant isolation ----------
+  const reportsTable = document.getElementById("reportsTable");
+  const reportsResult = document.getElementById("reportsResult");
+
+  function renderReportsInto(tbody, reports){
+    tbody.innerHTML = "";
+    if (!reports.length){
+      tbody.innerHTML = "<tr><td colspan=\"4\" class=\"id\">No reports for this tenant yet.</td></tr>";
+      return;
+    }
+    reports.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td>" + escapeHtml(r.title) + "</td>" +
+        "<td class=\"id mono\">" + escapeHtml(r.createdBy || "") + "</td>" +
+        "<td>" + (r.createdAt ? new Date(r.createdAt).toLocaleString() : "") + "</td>" +
+        "<td class=\"id mono\">" + ((r.id || "").slice(0,8)) + "</td>";
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById("loadReportsBtn").addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    if (!requireToken(token, reportsResult)) return;
+    const result = await apiCall("/reports", { method:"GET" }, token);
+    if (result.ok && Array.isArray(result.body)){
+      reportsTable.style.display = "";
+      reportsResult.classList.remove("show");
+      renderReportsInto(reportsTable.querySelector("tbody"), result.body);
+    } else {
+      reportsTable.style.display = "none";
+      showResult(reportsResult, result);
+    }
+  });
+
+  // Compare two tenants side by side
+  const compareToggle = document.getElementById("compareToggle");
+  const comparePanel = document.getElementById("comparePanel");
+  compareToggle.addEventListener("click", () => {
+    comparePanel.classList.toggle("show");
+    compareToggle.textContent = comparePanel.classList.contains("show")
+      ? "\u2212 Hide comparison" : "+ Compare against a second tenant's token";
+  });
+
+  document.getElementById("compareBtn").addEventListener("click", async () => {
+    const tokenA = tokenInput.value.trim();
+    const tokenB = document.getElementById("tokenB").value.trim();
+    const grid = document.getElementById("compareGrid");
+    if (!tokenA || !tokenB){
+      grid.innerHTML = "<div class=\"id\">Need both tokens filled in to compare.</div>";
+      return;
+    }
+    grid.innerHTML =
+      "<div class=\"compare-col\"><h3>Token A</h3><table><tbody id=\"colA\"></tbody></table></div>" +
+      "<div class=\"compare-col\"><h3>Token B</h3><table><tbody id=\"colB\"></tbody></table></div>";
+    const results = await Promise.all([
+      apiCall("/reports", { method:"GET" }, tokenA),
+      apiCall("/reports", { method:"GET" }, tokenB),
+    ]);
+    const resA = results[0], resB = results[1];
+    const colA = document.getElementById("colA"), colB = document.getElementById("colB");
+    if (resA.ok) renderReportsInto(colA, resA.body); else colA.innerHTML = "<tr><td class=\"id\">" + escapeHtml(resA.status + " " + resA.statusText) + "</td></tr>";
+    if (resB.ok) renderReportsInto(colB, resB.body); else colB.innerHTML = "<tr><td class=\"id\">" + escapeHtml(resB.status + " " + resB.statusText) + "</td></tr>";
+  });
+
+  // ---------- Usage metering ----------
+  const idemInput = document.getElementById("idempotencyKey");
+  const eventsTable = document.getElementById("eventsTable");
+  const meteringResult = document.getElementById("meteringResult");
+  idemInput.value = "key-" + mono8();
+  let lastIdemKey = null;
+
+  document.getElementById("regenKeyBtn").addEventListener("click", () => {
+    idemInput.value = "key-" + mono8();
+  });
+
+  async function sendMeteringEvent(keyOverride){
+    const token = tokenInput.value.trim();
+    if (!requireToken(token, meteringResult)) return;
+    const idemKey = keyOverride || idemInput.value.trim();
+    if (!idemKey){ idemInput.focus(); return; }
+
+    const result = await apiCall("/metering/events", {
+      method:"POST",
+      headers: { "Content-Type":"application/json", "Idempotency-Key": idemKey },
+      body: JSON.stringify({
+        eventType: document.getElementById("eventType").value,
+        quantity: Number(document.getElementById("quantity").value || 1),
+      }),
+    }, token);
+
+    if (result.ok && result.body && typeof result.body === "object"){
+      eventsTable.style.display = "";
+      meteringResult.classList.remove("show");
+      const tbody = eventsTable.querySelector("tbody");
+      const tr = document.createElement("tr");
+      const badge = result.body.replayed
+        ? "<span class=\"badge dup\">" + result.status + " replay</span>"
+        : "<span class=\"badge new\">" + result.status + " new</span>";
+      tr.innerHTML = "<td>" + badge + "</td><td>" + escapeHtml(result.body.eventType) + "</td>" +
+        "<td>" + result.body.quantity + "</td><td class=\"id mono\">" + escapeHtml(idemKey) + "</td>" +
+        "<td class=\"id mono\">" + ((result.body.id || "").slice(0,8)) + "</td>";
+      if (result.body.replayed){
+        // find any existing row with this key and flash it instead of just
+        // appending — makes the "same row, not a new one" point visually
+        const existingRows = [].slice.call(tbody.querySelectorAll("tr"));
+        const match = existingRows.find(r => r.children[3] && r.children[3].textContent === idemKey);
+        if (match){
+          match.classList.remove("flash"); void match.offsetWidth; match.classList.add("flash");
+        } else {
+          tbody.prepend(tr);
+        }
+      } else {
+        tbody.prepend(tr);
+      }
+      lastIdemKey = idemKey;
+      idemInput.value = "key-" + mono8();
+    } else {
+      showResult(meteringResult, result);
+    }
+  }
+
+  document.getElementById("sendEventBtn").addEventListener("click", () => sendMeteringEvent());
+  document.getElementById("retryEventBtn").addEventListener("click", () => {
+    if (lastIdemKey) sendMeteringEvent(lastIdemKey);
+    else showResult(meteringResult, { ok:false, status:0, statusText:"Nothing to resend", body:"Send an event first." });
+  });
+  document.getElementById("clearLogBtn").addEventListener("click", () => {
+    eventsTable.querySelector("tbody").innerHTML = "";
+    eventsTable.style.display = "none";
+    meteringResult.classList.remove("show");
+    lastIdemKey = null;
+  });
+
+  // ---------- Entitlements (real calls, real 403s) ----------
+  document.getElementById("tryCreateBtn").addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    const el = document.getElementById("createResult");
+    if (!requireToken(token, el)) return;
+    const result = await apiCall("/reports", {
+      method:"POST",
+      headers: { "Content-Type":"application/json" },
+      body: JSON.stringify({ title: "Demo report " + mono8(), body: "Created from the control plane demo page." }),
+    }, token);
+    showResult(el, result, result.status === 201 ? "created" : null);
+  });
+
+  document.getElementById("tryExportBtn").addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    const el = document.getElementById("exportResult");
+    if (!requireToken(token, el)) return;
+    const result = await apiCall("/reports/export", { method:"GET" }, token);
+    showResult(el, result);
+  });
+})();
+</script>
+</body>
+</html>
