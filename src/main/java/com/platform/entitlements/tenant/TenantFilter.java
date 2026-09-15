@@ -29,7 +29,8 @@ import java.io.IOException;
 public class TenantFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(TenantFilter.class);
-    private static final String TENANT_CLAIM = "custom:tenant_id"; // Cognito custom attribute convention
+    private static final String CUSTOM_TENANT_CLAIM = "custom:tenant_id";
+    private static final String TENANT_CLAIM = "tenant_id";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -62,7 +63,10 @@ public class TenantFilter extends OncePerRequestFilter {
         if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt)) {
             return null;
         }
-        Object claim = jwt.getClaims().get(TENANT_CLAIM);
+        Object claim = jwt.getClaims().get(CUSTOM_TENANT_CLAIM);
+        if (claim == null) {
+            claim = jwt.getClaims().get(TENANT_CLAIM);
+        }
         return claim == null ? null : claim.toString();
     }
 

@@ -8,7 +8,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 public class EntitlementsMethodSecurityExpressionHandler extends DefaultMethodSecurityExpressionHandler {
 
-    private static final String TENANT_CLAIM = "custom:tenant_id";
+    private static final String CUSTOM_TENANT_CLAIM = "custom:tenant_id";
+    private static final String TENANT_CLAIM = "tenant_id";
 
     @Override
     protected MethodSecurityExpressionOperations createSecurityExpressionRoot(
@@ -34,7 +35,10 @@ public class EntitlementsMethodSecurityExpressionHandler extends DefaultMethodSe
             // here, rather than this class silently guessing a tenant.
             return null;
         }
-        Object claim = jwt.getClaims().get(TENANT_CLAIM);
+        Object claim = jwt.getClaims().get(CUSTOM_TENANT_CLAIM);
+        if (claim == null) {
+            claim = jwt.getClaims().get(TENANT_CLAIM);
+        }
         return claim == null ? null : claim.toString();
     }
 }

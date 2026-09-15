@@ -286,7 +286,7 @@
     if (!token){ targetEl.textContent = "No token yet."; targetEl.className = "claims-line"; return null; }
     try{
       const claims = decodeJwtPayload(token);
-      const tenantId = claims["custom:tenant_id"] || "(missing custom:tenant_id claim)";
+      const tenantId = claims["custom:tenant_id"] || claims.tenant_id || "(missing custom:tenant_id or tenant_id claim)";
       const groups = (claims["cognito:groups"] || []).join(", ") || "(none)";
       const expMs = claims.exp ? claims.exp * 1000 : null;
       const expired = expMs && expMs < Date.now();
@@ -356,11 +356,11 @@
         });
         return false;
       }
-      if (!claims["custom:tenant_id"]){
+      if (!claims["custom:tenant_id"] && !claims.tenant_id){
         showResult(resultEl, {
           ok:false, status:403, statusText:"Forbidden",
           body:"This token is missing the custom:tenant_id claim.",
-          hint:"Create or update the Cognito custom attribute, grant the app client read access to it, then sign in again. The matching UUID must also exist in the deployed tenants table."
+          hint:"Use the ID token, set the user's custom:tenant_id value, grant the app client read access to that attribute, then sign in again. The matching UUID must also exist in the deployed tenants table."
         });
         return false;
       }
