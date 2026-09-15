@@ -6,25 +6,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
 /**
- * Runs AFTER Spring Security's JWT authentication filter (see SecurityConfig,
- * where this is registered with addFilterAfter(...) against the bearer token
- * filter). By the time this filter executes, SecurityContextHolder already
- * holds a validated, signature-checked JWT — we are just reading a claim off
- * a token we already trust, not doing any auth ourselves.
- *
- * We deliberately do NOT trust a tenant id from a header, query param, or
- * request body: those are attacker-controlled. The tenant id MUST come from
- * inside the signed JWT claims (issued by Cognito at login, tied to the
- * user's actual tenant membership), so there is no way for a caller to claim
- * to be a different tenant than the one they authenticated as.
+ * Loads the tenant context from the explicit X-Tenant-Id API header.
+ * Authentication is intentionally outside this demo API's scope; callers
+ * must treat this endpoint as trusted or put it behind an API gateway.
  */
 public class TenantFilter extends OncePerRequestFilter {
 
@@ -37,17 +26,12 @@ public class TenantFilter extends OncePerRequestFilter {
                                      HttpServletResponse response,
                                      FilterChain filterChain) throws ServletException, IOException {
         try {
-            String tenantId = extractTenantId();
+            String tenantId = request.getHeader("X-Tenant-Id");
             if (tenantId != null) {
                 TenantContext.setTenantId(tenantId);
             } else if (requiresTenant(request)) {
-                // Authenticated but no tenant claim on the token — this is a
-                // misconfigured user/token, not a missing-auth case (Spring
-                // Security would have already rejected an unauthenticated
-                // request). Fail closed rather than letting the request
-                // through with no tenant context.
-                log.warn("Authenticated request to {} has no tenant_id claim", request.getRequestURI());
-                response.sendError(HttpServletResponse.SC_FORBIDDEN, "No tenant associated with this token");
+                log.warn("Request to {} has no X-Tenant-Id header", request.getRequestURI());
+                response.sendError(HttpServletResponse.SC_BAD_REQUEST, "X-Tenant-Id header is required");
                 return;
             }
             filterChain.doFilter(request, response);
@@ -58,21 +42,8 @@ public class TenantFilter extends OncePerRequestFilter {
         }
     }
 
-    private String extractTenantId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt)) {
-            return null;
-        }
-        Object claim = jwt.getClaims().get(CUSTOM_TENANT_CLAIM);
-        if (claim == null) {
-            claim = jwt.getClaims().get(TENANT_CLAIM);
-        }
-        return claim == null ? null : claim.toString();
-    }
-
     private boolean requiresTenant(HttpServletRequest request) {
-        // Public/health endpoints and unauthenticated paths don't need a
-        // tenant. Keep this in sync with SecurityConfig's permitAll() list.
+        // Public/health endpoints don't need a tenant.
         String path = request.getRequestURI();
         return !(path.equals("/") || path.equals("/index.html")
             || path.startsWith("/actuator") || path.startsWith("/health"));

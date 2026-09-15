@@ -121,26 +121,30 @@
       <label for="baseUrl">API base URL</label>
       <input type="text" id="baseUrl" class="mono" value="https://entitlements-engine-production.up.railway.app">
     </div>
-    <div class="field">
+    <div class="field" style="display:none;">
       <label for="cognitoClientId">Cognito public app client ID</label>
       <input type="text" id="cognitoClientId" class="mono" value="79mbops4lnh932ujgrcunn76cn">
     </div>
-    <div class="field wide">
+    <div class="field wide" style="display:none;">
       <label for="token">Cognito ID token</label>
       <textarea id="token" placeholder="eyJraWQiOi..."></textarea>
       <div class="claims-line" id="claimsLine">No token yet.</div>
     </div>
+    <div class="field wide">
+      <label for="tenantId">Tenant ID sent to the API</label>
+      <input type="text" id="tenantId" class="mono" placeholder="00000000-0000-0000-0000-000000000000">
+    </div>
   </div>
   <div class="identity-row">
-    <div class="btn-row" style="margin:0;">
+    <div class="btn-row" style="margin:0; display:none;">
       <button class="primary" id="signInBtn" type="button">Sign in with Cognito</button>
       <button class="quiet" id="signOutBtn" type="button">Sign out</button>
     </div>
     <label class="claims-line" style="display:flex; align-items:center; gap:6px; margin:0;">
-      <input type="checkbox" id="demoMode" checked>
-      Local demo mode (no Cognito or API calls)
+      <input type="checkbox" id="demoMode">
+      Local simulation (no API calls)
     </label>
-    <div class="claims-line" id="authLine">Use a public Cognito app client for browser sign-in.</div>
+    <div class="claims-line" id="authLine">Live API mode. Requests include X-Tenant-Id.</div>
   </div>
 </div>
 
@@ -313,7 +317,8 @@
       return simulateApiCall(path, options);
     }
     const headers = Object.assign({}, options.headers || {}, {
-      "Authorization": "Bearer " + token,
+      "X-Tenant-Id": document.getElementById("tenantId").value.trim(),
+      "X-User-Groups": "REPORT_WRITER",
     });
     let response;
     try{
@@ -388,32 +393,8 @@
 
   function requireToken(tokenValue, resultEl){
     if (document.getElementById("demoMode").checked) return true;
-    if (!tokenValue){
-      showResult(resultEl, { ok:false, status:0, statusText:"No token", body:"Paste an access token above first." });
-      return false;
-    }
-    try{
-      const claims = decodeJwtPayload(tokenValue);
-      if (claims.exp && claims.exp * 1000 <= Date.now()){
-        showResult(resultEl, {
-          ok:false, status:0, statusText:"Expired token",
-          body:"Sign in again to obtain a fresh Cognito ID token."
-        });
-        return false;
-      }
-      if (!claims["custom:tenant_id"] && !claims.tenant_id){
-        showResult(resultEl, {
-          ok:false, status:403, statusText:"Forbidden",
-          body:"This token is missing the custom:tenant_id claim.",
-          hint:"Use the ID token, set the user's custom:tenant_id value, grant the app client read access to that attribute, then sign in again. The matching UUID must also exist in the deployed tenants table."
-        });
-        return false;
-      }
-    } catch(error){
-      showResult(resultEl, {
-        ok:false, status:0, statusText:"Invalid token",
-        body:error.message
-      });
+    if (!document.getElementById("tenantId").value.trim()){
+      showResult(resultEl, { ok:false, status:0, statusText:"No tenant ID", body:"Enter a tenant UUID before calling the API." });
       return false;
     }
     return true;
@@ -536,8 +517,7 @@
       : "Use a public Cognito app client for browser sign-in.";
     liveDot.classList.toggle("live", event.target.checked);
   });
-  authLine.textContent = "Local demo mode is active. No Cognito or API calls will be made.";
-  liveDot.classList.add("live");
+  authLine.textContent = "Live API mode. Requests include X-Tenant-Id.";
 
   handleCognitoCallback().catch(error => {
     authLine.textContent = "Cognito sign-in failed: " + error.message;

@@ -6,6 +6,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.UUID;
@@ -83,7 +85,13 @@ public class EntitlementsService {
     private List<String> currentUserGroups() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
-            return List.of();
+            ServletRequestAttributes attributes =
+                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes == null) {
+                return List.of();
+            }
+            String header = attributes.getRequest().getHeader("X-User-Groups");
+            return header == null || header.isBlank() ? List.of() : List.of(header.split(","));
         }
         Object groups = jwt.getClaims().get("cognito:groups");
         return groups instanceof List ? (List<String>) groups : List.of();

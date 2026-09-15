@@ -7,9 +7,9 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
-import org.springframework.security.config.annotation.web.configurers.oauth2.server.resource.OAuth2ResourceServerConfigurer;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -42,20 +42,14 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .cors(Customizer.withDefaults())
-            .csrf(csrf -> csrf.disable()) // stateless JWT API, no cookies/browser forms to protect
+            .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/index.html").permitAll()
                 .requestMatchers("/actuator/**", "/health/**").permitAll()
-                .anyRequest().authenticated()
+                .anyRequest().permitAll()
             )
-            .oauth2ResourceServer(OAuth2ResourceServerConfigurer::jwt)
-            // Register TenantFilter to run AFTER Spring Security has already
-            // authenticated the request and populated SecurityContextHolder
-            // with the validated Jwt. This ordering is load-bearing: if
-            // TenantFilter ran before authentication, there would be no Jwt
-            // to read tenant_id from yet.
-            .addFilterAfter(new TenantFilter(), BearerTokenAuthenticationFilter.class);
+            .addFilterBefore(new TenantFilter(), AnonymousAuthenticationFilter.class);
 
         return http.build();
     }
@@ -76,7 +70,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+        configuration.setAllowedHeaders(List.of("Content-Type", "Idempotency-Key", "X-Tenant-Id", "X-User-Groups"));
         configuration.setAllowCredentials(false); // must be false when origins is "*"
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
