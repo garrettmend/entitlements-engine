@@ -347,6 +347,30 @@
       showResult(resultEl, { ok:false, status:0, statusText:"No token", body:"Paste an access token above first." });
       return false;
     }
+    try{
+      const claims = decodeJwtPayload(tokenValue);
+      if (claims.exp && claims.exp * 1000 <= Date.now()){
+        showResult(resultEl, {
+          ok:false, status:0, statusText:"Expired token",
+          body:"Sign in again to obtain a fresh Cognito ID token."
+        });
+        return false;
+      }
+      if (!claims["custom:tenant_id"]){
+        showResult(resultEl, {
+          ok:false, status:403, statusText:"Forbidden",
+          body:"This token is missing the custom:tenant_id claim.",
+          hint:"Create or update the Cognito custom attribute, grant the app client read access to it, then sign in again. The matching UUID must also exist in the deployed tenants table."
+        });
+        return false;
+      }
+    } catch(error){
+      showResult(resultEl, {
+        ok:false, status:0, statusText:"Invalid token",
+        body:error.message
+      });
+      return false;
+    }
     return true;
   }
 
