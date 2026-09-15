@@ -6,6 +6,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+
 /**
  * Runs migrations using a DEDICATED connection built straight from
  * spring.flyway.url/user/password — deliberately NOT the same DataSource
@@ -31,10 +36,34 @@ public class FlywayConfig {
     }
 
     @Bean(initMethod = "migrate")
-    public Flyway flyway(FlywayProperties flywayProperties) {
+    public Flyway flyway(FlywayProperties flywayProperties) throws SQLException {
+        repairSchemaHistory(flywayProperties);
         return Flyway.configure()
                 .dataSource(flywayProperties.getUrl(), flywayProperties.getUser(), flywayProperties.getPassword())
                 .locations(flywayProperties.getLocations().toArray(new String[0]))
                 .load();
+    }
+
+    private void repairSchemaHistory(FlywayProperties properties) throws SQLException {
+        try (Connection connection = DriverManager.getConnection(
+                properties.getUrl(), properties.getUser(), properties.getPassword());
+             Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1
+                            FROM information_schema.columns
+                            WHERE table_schema = 'public'
+                              AND table_name = 'flyway_schema_history'
+                              AND column_name = 'installed_on'
+                        ) THEN
+                            ALTER TABLE public.flyway_schema_history
+                                ALTER COLUMN installed_on SET DEFAULT CURRENT_TIMESTAMP;
+                        END IF;
+                    END
+                    $$
+                    """);
+        }
     }
 }
