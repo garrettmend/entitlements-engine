@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: entitlements-engine
+
+  datasource:
+    # Runtime pool the application actually queries through. This role must
+    # be neither a superuser nor the owner of the `reports` table, or RLS
+    # policies won't apply to it (see V2__enable_row_level_security.sql).
+    # For local dev: docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:entitlements}
+    username: ${DB_APP_USER:entitlements_app}
+    password: ${DB_APP_PASSWORD:app_runtime_password}
+    hikari:
+      # Keep the pool modest locally; RLS correctness matters more than
+      # throughput while you're getting this right. Tune up for prod.
+      maximum-pool-size: 10
+      pool-name: entitlements-hikari
+
+  flyway:
+    # Deliberately a DIFFERENT, privileged role from spring.datasource.*
+    # above — see FlywayConfig. This role owns the schema and can run DDL
+    # (CREATE TABLE, CREATE POLICY); the runtime role above cannot.
+    url: ${MIGRATION_DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:entitlements}}
+    user: ${MIGRATION_DB_USER:entitlements_owner}
+    password: ${MIGRATION_DB_PASSWORD:owner_password}
+    enabled: true
+    locations: classpath:db/migration
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # schema is owned by Flyway migrations, never Hibernate auto-DDL
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false     # avoid holding connections (and the tenant session var) longer than needed
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Replace with your actual Cognito user pool issuer, e.g.
+          # https://cognito-idp.<region>.amazonaws.com/<user-pool-id>
+          issuer-uri: ${COGNITO_ISSUER_URI:https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX}
+
+aws:
+  region: ${AWS_REGION:us-east-1}
+  dynamodb:
+    entitlements-table: ${ENTITLEMENTS_TABLE:tenant-entitlements}
+  eventbridge:
+    event-bus-name: ${METERING_EVENT_BUS:metering-events}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    com.platform.entitlements: DEBUG
+
+server:
+  port: ${PORT:8080}
