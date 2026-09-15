@@ -126,7 +126,7 @@
       <input type="text" id="cognitoClientId" class="mono" value="79mbops4lnh932ujgrcunn76cn">
     </div>
     <div class="field wide">
-      <label for="token">Access token</label>
+      <label for="token">Cognito ID token</label>
       <textarea id="token" placeholder="eyJraWQiOi..."></textarea>
       <div class="claims-line" id="claimsLine">No token yet.</div>
     </div>
@@ -405,13 +405,13 @@
       }),
     });
     const result = await response.json();
-    if (!response.ok || !result.access_token){
+    if (!response.ok || !(result.id_token || result.access_token)){
       authLine.textContent = "Cognito sign-in failed: " + (result.error_description || result.error || "token exchange failed");
       return;
     }
 
     sessionStorage.removeItem("cognito_code_verifier");
-    saveToken(result.access_token);
+    saveToken(result.id_token || result.access_token);
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
