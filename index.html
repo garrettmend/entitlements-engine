@@ -429,13 +429,13 @@
       }),
     });
     const result = await response.json();
-    if (!response.ok || !(result.id_token || result.access_token)){
+    if (!response.ok || !result.id_token){
       authLine.textContent = "Cognito sign-in failed: " + (result.error_description || result.error || "token exchange failed");
       return;
     }
 
     sessionStorage.removeItem("cognito_code_verifier");
-    saveToken(result.id_token || result.access_token);
+    saveToken(result.id_token);
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
