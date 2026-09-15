@@ -53,7 +53,7 @@ public class ReportController {
     // JWT). An Enterprise-tenant user without the group is rejected; a
     // Pro-tenant user WITH the group is still rejected — neither attribute
     // alone is sufficient.
-    @PreAuthorize("@entitlements.canAccess(tenantId, 'CREATE_REPORT')")
+    @PreAuthorize("@entitlements.canAccess(T(com.platform.entitlements.tenant.TenantContext).getTenantId(), 'CREATE_REPORT')")
     public Report createReport(@RequestBody CreateReportRequest request, Authentication authentication) {
         Report report = new Report();
         // tenant_id comes from TenantContext (itself derived from the JWT),
@@ -73,7 +73,7 @@ public class ReportController {
     // user at a qualifying tenant can call this, regardless of their own
     // individual permissions. Shows PermissionRule supporting either
     // attribute independently, not just the combined case.
-    @PreAuthorize("@entitlements.canAccess(tenantId, 'EXPORT_DATA')")
+    @PreAuthorize("@entitlements.canAccess(T(com.platform.entitlements.tenant.TenantContext).getTenantId(), 'EXPORT_DATA')")
     public ResponseEntity<String> exportReports() {
         List<Report> reports = reportRepository.findAll();
         StringBuilder csv = new StringBuilder("id,title,created_by,created_at\n");
