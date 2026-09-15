@@ -35,7 +35,6 @@ public class FlywayConfig {
         return Flyway.configure()
                 .dataSource(flywayProperties.getUrl(), flywayProperties.getUser(), flywayProperties.getPassword())
                 .locations(flywayProperties.getLocations().toArray(new String[0]))
-                .baselineOnMigrate(true)
                 .load();
     }
 }
