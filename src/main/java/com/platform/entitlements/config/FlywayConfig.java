@@ -36,13 +36,19 @@ public class FlywayConfig {
         return new FlywayProperties();
     }
 
-    @Bean(initMethod = "migrate")
+    @Bean
     public Flyway flyway(FlywayProperties flywayProperties) throws SQLException {
         repairSchemaHistory(flywayProperties);
-        return Flyway.configure()
+        Flyway flyway = Flyway.configure()
                 .dataSource(flywayProperties.getUrl(), flywayProperties.getUser(), flywayProperties.getPassword())
                 .locations(flywayProperties.getLocations().toArray(new String[0]))
                 .load();
+        // Migration scripts here get tweaked in place after being applied (see git history),
+        // which changes their checksum and fails validation. Repair realigns the recorded
+        // checksums with the current file contents before migrating.
+        flyway.repair();
+        flyway.migrate();
+        return flyway;
     }
 
     private void repairSchemaHistory(FlywayProperties properties) throws SQLException {
