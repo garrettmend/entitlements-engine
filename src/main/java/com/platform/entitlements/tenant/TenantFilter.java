@@ -47,6 +47,7 @@ public class TenantFilter extends OncePerRequestFilter {
         // Public/health endpoints don't need a tenant.
         String path = request.getRequestURI();
         return !(path.equals("/") || path.equals("/index.html") || path.equals("/tenants/first")
+            || path.equals("/tenants/random")
             || path.startsWith("/actuator") || path.startsWith("/health"));
     }
 
@@ -54,6 +55,7 @@ public class TenantFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
         return path.equals("/") || path.equals("/index.html") || path.equals("/tenants/first")
+            || path.equals("/tenants/random")
             || path.startsWith("/actuator") || path.startsWith("/health");
     }
 }

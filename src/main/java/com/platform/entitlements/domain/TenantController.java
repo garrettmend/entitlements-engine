@@ -24,6 +24,13 @@ public class TenantController {
                 .orElseThrow(() -> new IllegalStateException("No tenants found"));
     }
 
+    @GetMapping("/random")
+    public FirstTenantResponse randomTenant() {
+        return tenantRepository.findRandomTenant()
+                .map(tenant -> new FirstTenantResponse(tenant.getId()))
+                .orElseThrow(() -> new IllegalStateException("No tenants found"));
+    }
+
     public record FirstTenantResponse(UUID id) {
     }
 }

@@ -26,6 +26,8 @@
   .dot.live{background:var(--green); box-shadow:0 0 0 3px var(--green-dim);}
   .field{display:flex; flex-direction:column; gap:4px; flex:1; min-width:200px;}
   .field.wide{flex:2; min-width:320px;}
+  .tenant-input-row{display:flex; gap:8px; align-items:center;}
+  .tenant-input-row input{flex:1; min-width:0;}
   .field label{font-size:11.5px; color:var(--muted);}
   select, input[type="number"], input[type="text"], textarea{
     background:var(--panel-raised); border:1px solid var(--line); color:var(--text);
@@ -133,7 +135,10 @@
     </div>
     <div class="field wide">
       <label for="tenantId">Tenant ID sent to the API</label>
-      <input type="text" id="tenantId" class="mono" placeholder="00000000-0000-0000-0000-000000000000">
+      <div class="tenant-input-row">
+        <input type="text" id="tenantId" class="mono" placeholder="00000000-0000-0000-0000-000000000000">
+        <button type="button" id="randomTenantBtn">Get random tenant</button>
+      </div>
       <div class="claims-line" id="tenantLoadLine">Loading first tenant from the database...</div>
     </div>
   </div>
@@ -296,6 +301,27 @@
       tenantLoadLine.className = "claims-line";
     } catch(error){
       tenantLoadLine.textContent = "Couldn't load a tenant from the database: " + error.message;
+      tenantLoadLine.className = "claims-line error";
+    }
+  }
+
+  async function loadRandomTenant(){
+    const tenantInput = document.getElementById("tenantId");
+    const tenantLoadLine = document.getElementById("tenantLoadLine");
+    if (document.getElementById("demoMode").checked){
+      tenantLoadLine.textContent = "Random tenants require live API mode.";
+      tenantLoadLine.className = "claims-line error";
+      return;
+    }
+    try{
+      const response = await fetch(baseUrl() + "/tenants/random");
+      const body = await response.json();
+      if (!response.ok || !body.id) throw new Error(body.message || response.statusText || "No tenant found");
+      tenantInput.value = body.id;
+      tenantLoadLine.textContent = "Random tenant loaded from the database.";
+      tenantLoadLine.className = "claims-line";
+    } catch(error){
+      tenantLoadLine.textContent = "Couldn't load a random tenant: " + error.message;
       tenantLoadLine.className = "claims-line error";
     }
   }
@@ -540,6 +566,8 @@
     liveDot.classList.toggle("live", event.target.checked);
   });
   authLine.textContent = "Live API mode. Requests include X-Tenant-Id.";
+
+  document.getElementById("randomTenantBtn").addEventListener("click", loadRandomTenant);
 
   handleCognitoCallback().catch(error => {
     authLine.textContent = "Cognito sign-in failed: " + error.message;
