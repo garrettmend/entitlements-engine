@@ -172,6 +172,9 @@
         <li>For "Export data" to succeed: tier is <code>PRO</code> or <code>ENTERPRISE</code></li>
       </ul>
     </div>
+    <div class="btn-row" style="margin-top:14px;">
+      <button id="runSmokeTestBtn" type="button">Run smoke test (open DevTools console)</button>
+    </div>
   </div>
 
   <!-- ================= TENANT ISOLATION ================= -->
@@ -786,6 +789,110 @@
       body: JSON.stringify({ tier: tier }),
     }, token);
     showResult(el, result, result.status === 204 ? "tier set to " + tier + " — try Create report / Export data above" : null);
+  });
+
+  // ---------- Browser console smoke test ----------
+  // Runs the same live-API checks this page's buttons trigger manually, but
+  // end to end and unattended — logged to the console instead of the DOM so
+  // it can be pasted into a bug report or watched during a live demo.
+  async function setTier(tier){
+    const tenantId = document.getElementById("tenantId").value.trim();
+    return apiCall("/admin/tenants/" + encodeURIComponent(tenantId) + "/subscription-tier", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tier: tier }),
+    });
+  }
+
+  async function runSmokeTest(){
+    const steps = [];
+    function record(name, passed, detail){
+      steps.push({ name, passed, detail });
+      console.log((passed ? "%c PASS " : "%c FAIL "), passed ? "background:#233229;color:#5FB88A" : "background:#3A2320;color:#D9634F", name, detail || "");
+    }
+
+    console.group("Entitlements Engine — browser smoke test");
+    console.log("Tenant:", document.getElementById("tenantId").value.trim(), "| API:", baseUrl());
+    if (document.getElementById("demoMode").checked){
+      console.warn("Local simulation is on — turn it off for these checks to hit the real API.");
+    }
+
+    try{
+      const enterprise = await setTier("ENTERPRISE");
+      record("Set tier to ENTERPRISE", enterprise.status === 204, enterprise.status + " " + enterprise.statusText);
+
+      const created = await apiCall("/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Smoke test report " + mono8() }),
+      });
+      record("Create report as ENTERPRISE tenant -> 201", created.status === 201, created.status + " " + created.statusText);
+
+      const listed = await apiCall("/reports", { method: "GET" });
+      record("List reports returns an array", Array.isArray(listed.body), Array.isArray(listed.body) ? listed.body.length + " row(s)" : listed.status);
+
+      if (created.ok && created.body && created.body.id){
+        const fetched = await apiCall("/reports/" + created.body.id, { method: "GET" });
+        record("Fetch the just-created report by id -> 200", fetched.status === 200, fetched.status + " " + fetched.statusText);
+      }
+
+      const exportRes = await apiCall("/reports/export", { method: "GET" });
+      record("Export data as ENTERPRISE tenant -> 200", exportRes.status === 200, exportRes.status + " " + exportRes.statusText);
+
+      const free = await setTier("FREE");
+      record("Set tier to FREE", free.status === 204, free.status + " " + free.statusText);
+
+      const deniedCreate = await apiCall("/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Should be denied " + mono8() }),
+      });
+      record("Create report as FREE tenant -> 403", deniedCreate.status === 403, deniedCreate.status + " " + deniedCreate.statusText);
+
+      const deniedExport = await apiCall("/reports/export", { method: "GET" });
+      record("Export data as FREE tenant -> 403", deniedExport.status === 403, deniedExport.status + " " + deniedExport.statusText);
+
+      const key = "smoke-" + mono8();
+      const firstEvent = await apiCall("/metering/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+        body: JSON.stringify({ eventType: "API_CALL", quantity: 1 }),
+      });
+      record("Send metering event -> 201", firstEvent.status === 201, firstEvent.status + " " + firstEvent.statusText);
+
+      const replayedEvent = await apiCall("/metering/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+        body: JSON.stringify({ eventType: "API_CALL", quantity: 1 }),
+      });
+      const isSameEvent = replayedEvent.ok && firstEvent.ok && replayedEvent.body && firstEvent.body
+        && replayedEvent.body.id === firstEvent.body.id;
+      record("Resend same Idempotency-Key replays original event -> 200", replayedEvent.status === 200 && isSameEvent, replayedEvent.status + " " + replayedEvent.statusText);
+    } finally {
+      // Leave the shared demo tenant on the "everything succeeds" default.
+      await setTier("ENTERPRISE");
+    }
+
+    const passCount = steps.filter(s => s.passed).length;
+    console.log("%c" + passCount + " / " + steps.length + " checks passed", "font-weight:bold");
+    console.table(steps);
+    console.groupEnd();
+    return steps;
+  }
+
+  document.getElementById("runSmokeTestBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("runSmokeTestBtn");
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = "Running... check the console";
+    try{
+      await runSmokeTest();
+    } catch(error){
+      console.error("Smoke test crashed:", error);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   });
 })();
 </script>
