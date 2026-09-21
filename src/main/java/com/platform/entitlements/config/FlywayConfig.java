@@ -1,3 +1,4 @@
+/** Runs Flyway migrations through a dedicated privileged database connection separate from runtime queries. */
 package com.platform.entitlements.config;
 
 import org.flywaydb.core.Flyway;

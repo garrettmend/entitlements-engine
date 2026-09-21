@@ -1,3 +1,4 @@
+/** Integration-tests concurrent idempotent inserts against real PostgreSQL and Row-Level Security. */
 package com.platform.entitlements.metering;
 
 import com.platform.entitlements.tenant.TenantContext;

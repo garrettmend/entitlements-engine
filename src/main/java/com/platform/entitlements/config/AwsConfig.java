@@ -1,3 +1,4 @@
+/** Configures AWS clients and enables asynchronous listeners and scheduled jobs used by the application. */
 package com.platform.entitlements.config;
 
 import org.springframework.beans.factory.annotation.Value;

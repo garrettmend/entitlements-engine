@@ -1,3 +1,4 @@
+# Excludes local-only and generated files from the Docker build context.
 .git
 .github
 target

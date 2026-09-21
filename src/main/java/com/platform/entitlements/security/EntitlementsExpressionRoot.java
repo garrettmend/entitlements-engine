@@ -1,3 +1,4 @@
+/** Adds the current tenant ID to Spring Security's method-expression context for ABAC checks. */
 package com.platform.entitlements.security;
 
 import org.springframework.security.access.expression.SecurityExpressionRoot;

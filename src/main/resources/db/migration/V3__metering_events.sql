@@ -1,3 +1,4 @@
+-- Creates tenant-scoped metering events, idempotency constraints, publication indexes, and RLS policy.
 -- Usage metering events: tenant-owned, so it follows the same RLS pattern
 -- as `reports` from V2. The one new wrinkle is the idempotency constraint.
 

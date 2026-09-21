@@ -1,3 +1,4 @@
+/** Evaluates ABAC permissions by combining tenant subscription tiers with the authenticated user's groups. */
 package com.platform.entitlements.abac;
 
 import com.platform.entitlements.domain.Tenant;

@@ -1,3 +1,4 @@
+/** Integration-tests PostgreSQL Row-Level Security by proving tenants cannot see one another's reports. */
 package com.platform.entitlements;
 
 import com.platform.entitlements.domain.Report;

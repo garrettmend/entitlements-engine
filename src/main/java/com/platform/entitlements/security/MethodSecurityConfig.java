@@ -1,3 +1,4 @@
+/** Enables method-level Spring Security and registers the custom ABAC expression handler. */
 package com.platform.entitlements.security;
 
 import org.springframework.context.annotation.Bean;

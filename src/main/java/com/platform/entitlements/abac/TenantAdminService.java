@@ -1,3 +1,4 @@
+/** Updates the tenant tier in PostgreSQL and writes the new value through to the entitlement cache. */
 package com.platform.entitlements.abac;
 
 import com.platform.entitlements.domain.Tenant;

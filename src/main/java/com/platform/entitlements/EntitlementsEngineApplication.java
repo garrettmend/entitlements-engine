@@ -1,3 +1,4 @@
+/** Starts the Spring Boot application and enables component scanning for the entitlements engine. */
 package com.platform.entitlements;
 
 import org.springframework.boot.SpringApplication;

@@ -1,3 +1,4 @@
+# Excludes generated build output, IDE metadata, and local logs from version control.
 target/
 .idea/
 *.iml

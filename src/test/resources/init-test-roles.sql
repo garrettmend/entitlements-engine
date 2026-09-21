@@ -1,3 +1,4 @@
+-- Creates the restricted runtime PostgreSQL role used to prove Row-Level Security in integration tests.
 -- Runs once during Postgres container initdb, as the container's default
 -- superuser (see PostgreSQLContainer.withUsername in the test — that user
 -- is ALWAYS a superuser in the official postgres image, which is exactly

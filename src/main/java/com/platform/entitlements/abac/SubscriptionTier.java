@@ -1,3 +1,4 @@
+/** Defines the ordered tenant subscription tiers used by authorization comparisons. */
 package com.platform.entitlements.abac;
 
 /**

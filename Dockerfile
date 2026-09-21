@@ -1,3 +1,4 @@
+ # Builds the Spring Boot JAR in Maven and runs it in a smaller Java 21 runtime image.
 FROM maven:3.9.16-eclipse-temurin-21 AS build
 
 WORKDIR /workspace

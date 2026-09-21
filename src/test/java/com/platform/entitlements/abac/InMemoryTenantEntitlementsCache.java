@@ -1,3 +1,4 @@
+/** Provides the test-profile in-memory implementation of the tenant entitlement cache. */
 package com.platform.entitlements.abac;
 
 import org.springframework.context.annotation.Profile;

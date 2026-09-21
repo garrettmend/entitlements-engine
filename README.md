@@ -1,3 +1,4 @@
+<!-- Explains how to run and use the live control-plane frontend with the deployed backend. -->
 # Control Plane — Live Frontend
 
 `index.html` now calls the real, deployed backend directly — no simulation.

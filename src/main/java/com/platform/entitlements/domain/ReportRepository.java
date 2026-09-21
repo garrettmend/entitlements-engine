@@ -1,3 +1,4 @@
+/** Provides JPA persistence operations for reports while PostgreSQL RLS enforces tenant filtering. */
 package com.platform.entitlements.domain;
 
 import org.springframework.data.jpa.repository.JpaRepository;

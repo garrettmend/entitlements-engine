@@ -1,3 +1,4 @@
+-- Repairs or completes the baseline tenant and report schema before Row-Level Security is enabled.
 -- Repairs databases that were incorrectly baselined before V1 ran.
 -- On a fresh database these statements are no-ops because V1 already created
 -- the tables. This migration must remain before V2, which applies RLS to reports.

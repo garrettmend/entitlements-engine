@@ -1,3 +1,4 @@
+/** Configures stateless HTTP security, CORS, public paths, and the tenant request filter. */
 package com.platform.entitlements.security;
 
 import com.platform.entitlements.tenant.TenantFilter;

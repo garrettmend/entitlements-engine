@@ -1,3 +1,4 @@
+/** Defines the static permission rules that map permission codes to required tiers and user groups. */
 package com.platform.entitlements.abac;
 
 import java.util.Map;

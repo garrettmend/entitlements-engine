@@ -1,3 +1,4 @@
+/** Periodically retries old unpublished events so committed usage eventually reaches the external publisher. */
 package com.platform.entitlements.metering;
 
 import com.platform.entitlements.tenant.TenantContext;

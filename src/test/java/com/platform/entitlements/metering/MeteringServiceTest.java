@@ -1,3 +1,4 @@
+/** Unit-tests metering service branches for new events, safe replays, and payload conflicts. */
 package com.platform.entitlements.metering;
 
 import org.junit.jupiter.api.Test;

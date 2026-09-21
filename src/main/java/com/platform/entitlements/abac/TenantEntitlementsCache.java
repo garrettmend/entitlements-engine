@@ -1,3 +1,4 @@
+/** Defines the cache contract for reading, writing, and evicting tenant subscription tiers. */
 package com.platform.entitlements.abac;
 
 import java.util.Optional;

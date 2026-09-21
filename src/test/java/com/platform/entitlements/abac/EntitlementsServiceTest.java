@@ -1,3 +1,4 @@
+/** Unit-tests ABAC tier, group, cache-hit, cache-miss, and denial behavior without external services. */
 package com.platform.entitlements.abac;
 
 import com.platform.entitlements.domain.Tenant;

@@ -1,3 +1,4 @@
+/** Implements the production tenant-tier cache using DynamoDB with TTL and graceful cache-failure handling. */
 package com.platform.entitlements.abac;
 
 import org.springframework.beans.factory.annotation.Value;

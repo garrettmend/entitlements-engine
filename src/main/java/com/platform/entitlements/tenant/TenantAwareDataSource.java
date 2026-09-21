@@ -1,3 +1,4 @@
+/** Copies the current tenant into PostgreSQL sessions and clears it before pooled connections are reused. */
 package com.platform.entitlements.tenant;
 
 import org.springframework.jdbc.datasource.DelegatingDataSource;
@@ -37,22 +38,30 @@ public class TenantAwareDataSource extends DelegatingDataSource {
 
     @Override
     public Connection getConnection() throws SQLException {
+        // Step 1: borrow a physical connection from the Hikari pool.
         Connection physical = super.getConnection();
+
+        // Step 2: bind this connection checkout to the request tenant.
         applyTenant(physical);
+
+        // Step 3: return a proxy that resets tenant state when the caller closes it.
         return wrapWithResetOnClose(physical);
     }
 
     private void applyTenant(Connection connection) throws SQLException {
+        // Step 2a: use an empty value when no tenant is present so RLS fails closed.
         String tenantId = TenantContext.isSet() ? TenantContext.getTenantId() : "";
         // set_config(..., is_local => false) sets it for the session (this
         // checkout), not just the current transaction — we want it to hold
         // across multiple statements/transactions within one request.
         try (Statement st = connection.createStatement()) {
+            // Step 2b: set the PostgreSQL session variable used by RLS policies.
             st.execute("SELECT set_config('app.current_tenant', '" + escapeLiteral(tenantId) + "', false)");
         }
     }
 
     private String escapeLiteral(String value) {
+        // Step 2c: escape apostrophes before embedding the tenant value in SQL.
         // tenant ids are UUIDs from validated JWT claims, but never trust
         // that blindly when building SQL by string concatenation.
         return value.replace("'", "''");
@@ -61,6 +70,7 @@ public class TenantAwareDataSource extends DelegatingDataSource {
     private Connection wrapWithResetOnClose(Connection physical) {
         InvocationHandler handler = (proxy, method, args) -> {
             if ("close".equals(method.getName())) {
+                // Step 4: clear tenant state before the physical connection returns to Hikari.
                 try (Statement st = physical.createStatement()) {
                     st.execute("SELECT set_config('app.current_tenant', '', false)");
                 } catch (SQLException ignored) {
@@ -69,6 +79,8 @@ public class TenantAwareDataSource extends DelegatingDataSource {
                 }
                 return method.invoke(physical, args);
             }
+
+            // Step 5: delegate every non-close JDBC operation to the physical connection.
             try {
                 return method.invoke(physical, args);
             } catch (java.lang.reflect.InvocationTargetException e) {

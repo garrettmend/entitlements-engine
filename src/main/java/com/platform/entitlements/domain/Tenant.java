@@ -1,3 +1,4 @@
+/** Defines the tenant registry entity containing identity, name, subscription tier, and creation time. */
 package com.platform.entitlements.domain;
 
 import jakarta.persistence.*;

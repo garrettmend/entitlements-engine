@@ -1,3 +1,4 @@
+/** Provides tenant-scoped report listing, lookup, creation, and CSV export endpoints. */
 package com.platform.entitlements.domain;
 
 import com.platform.entitlements.tenant.TenantContext;

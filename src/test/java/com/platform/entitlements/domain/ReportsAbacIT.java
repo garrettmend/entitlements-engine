@@ -1,3 +1,4 @@
+/** Integration-tests real HTTP report authorization through Spring Security, JWT claims, ABAC, and PostgreSQL. */
 package com.platform.entitlements.domain;
 
 import com.platform.entitlements.abac.SubscriptionTier;

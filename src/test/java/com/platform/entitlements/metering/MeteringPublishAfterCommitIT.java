@@ -1,3 +1,4 @@
+/** Integration-tests asynchronous after-commit publication and replay suppression with a test publisher. */
 package com.platform.entitlements.metering;
 
 import com.platform.entitlements.tenant.TenantContext;

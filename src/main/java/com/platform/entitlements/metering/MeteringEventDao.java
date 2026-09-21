@@ -1,3 +1,4 @@
+/** Performs the atomic PostgreSQL insert that guarantees tenant-scoped idempotency under concurrency. */
 package com.platform.entitlements.metering;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -8,25 +9,38 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+
 /**
- * The whole idempotency guarantee lives in this one query. We deliberately
- * do NOT do "SELECT to check if it exists, then INSERT if not" — that has
- * a race window: two near-simultaneous duplicate requests (a client retry
- * firing while the first attempt is still in flight, which is the exact
- * scenario idempotency keys exist to handle) can both pass the SELECT
- * check before either has committed an INSERT, and both proceed to insert,
- * defeating the whole point.
+ * WHY THIS FILE EXISTS:
+ * This DAO owns the one database operation that creates a metering event.
+ * It uses PostgreSQL's atomic INSERT ... ON CONFLICT behavior so concurrent
+ * requests with the same tenant and idempotency key cannot create duplicate
+ * usage rows. The service layer decides whether an empty result is a replay
+ * or a payload conflict; this class only reports whether the insert won.
  *
- * INSERT ... ON CONFLICT (tenant_id, idempotency_key) DO NOTHING RETURNING id
- * pushes the check-and-insert into a single atomic operation at the
- * database level. Postgres's unique index guarantees only one of two
- * concurrent inserts with the same key can ever succeed; the loser's
- * INSERT returns zero rows (not an error, not a thrown exception) rather
- * than racing.
+ * RUNTIME FLOW:
+ * 1. Receive the tenant and usage payload from MeteringService.
+ * 2. Attempt one atomic insert guarded by the database unique constraint.
+ * 3. Return the generated event ID for a new row, or Optional.empty() for a duplicate.
+ *
+ * THE RACE CONDITION PROBLEM:
+ * If we did this the naive way:
+ * a) SELECT to see if key exists
+ * b) IF NOT, then INSERT
+ * 
+ * If two requests arrive at the exact same millisecond, both threads run step (a) 
+ * at the same time. Both see "not found". Both proceed to step (b). We double-bill 
+ * the customer. 
+ * 
+ * THE POSTGRESQL SOLUTION:
+ * This class uses Postgres's "ON CONFLICT... DO NOTHING". It forces the database 
+ * engine to handle both the check and the insert as a single, atomic operation 
+ * relying on a unique index in the database itself.
  */
 @Repository
 public class MeteringEventDao {
 
+    // Spring's core tool for executing raw SQL queries securely.
     private final JdbcTemplate jdbcTemplate;
 
     public MeteringEventDao(JdbcTemplate jdbcTemplate) {
@@ -34,25 +48,36 @@ public class MeteringEventDao {
     }
 
     /**
-     * Attempts to insert a new event. Returns the new row's id if this call
-     * won the race (i.e. this is genuinely the first time this idempotency
-     * key has been seen for this tenant), or empty if a row with this
-     * (tenant_id, idempotency_key) already existed — meaning this is a
-     * duplicate/retry and the caller should look up and return the
-     * EXISTING row's data, not treat this as a new event.
+     * Attempts to insert a new event. 
+     * Returns:
+     * - An ID if successful (meaning this is a new event).
+     * - Optional.empty() if it hits a conflict (meaning this is a duplicate).
      */
     public Optional<UUID> insertIfAbsent(UUID tenantId, String idempotencyKey,
-                                          String eventType, BigDecimal quantity) {
+                                         String eventType, BigDecimal quantity) {
+
+        // Step 1: execute one parameterized SQL operation through Spring JDBC.
+        // query() returns one generated ID for a new row or no rows on conflict.
         List<UUID> insertedIds = jdbcTemplate.query(
                 """
+            -- Step 2: let PostgreSQL generate the durable event ID and insert the payload.
                 INSERT INTO metering_events (id, tenant_id, idempotency_key, event_type, quantity)
                 VALUES (gen_random_uuid(), ?, ?, ?, ?)
+                
+            -- Step 3: make the tenant-scoped uniqueness check and insert atomic.
+            -- A duplicate becomes an empty result instead of an exception.
                 ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
+                
+            -- Step 4: return an ID only when this call created the row.
                 RETURNING id
                 """,
+            // Step 5: map PostgreSQL's returned UUID into Java's UUID type.
                 (rs, rowNum) -> (UUID) rs.getObject("id"),
+            // Step 6: bind values as JDBC parameters rather than concatenating SQL.
                 tenantId, idempotencyKey, eventType, quantity);
 
+        // Step 7: expose the outcome to MeteringService: present means new,
+        // empty means an existing tenant/key pair won the race.
         return insertedIds.stream().findFirst();
     }
 }

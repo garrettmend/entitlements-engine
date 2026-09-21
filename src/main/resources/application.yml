@@ -1,3 +1,4 @@
+ # Configures Spring, PostgreSQL, Flyway, Cognito, AWS services, management endpoints, and the server port.
 spring:
   application:
     name: entitlements-engine

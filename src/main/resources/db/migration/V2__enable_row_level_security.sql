@@ -1,3 +1,4 @@
+-- Enables and documents PostgreSQL Row-Level Security for tenant-owned report data.
 -- Row-Level Security enforcement.
 --
 -- CRITICAL GOTCHA #1: RLS policies are silently bypassed for the table

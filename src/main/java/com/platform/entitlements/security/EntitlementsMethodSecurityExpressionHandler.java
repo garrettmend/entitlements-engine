@@ -1,3 +1,4 @@
+/** Creates the custom security expression root used by @PreAuthorize authorization expressions. */
 package com.platform.entitlements.security;
 
 import org.aopalliance.intercept.MethodInvocation;

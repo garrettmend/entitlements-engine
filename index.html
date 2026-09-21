@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Provides the browser-based control-plane UI for testing tenant isolation, metering, and ABAC. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -133,6 +134,7 @@
     <div class="field wide">
       <label for="tenantId">Tenant ID sent to the API</label>
       <input type="text" id="tenantId" class="mono" placeholder="00000000-0000-0000-0000-000000000000">
+      <div class="claims-line" id="tenantLoadLine">Loading first tenant from the database...</div>
     </div>
   </div>
   <div class="identity-row">
@@ -276,6 +278,26 @@
   }
   function baseUrl(){
     return document.getElementById("baseUrl").value.trim().replace(/\/+$/, "");
+  }
+
+  async function loadFirstTenant(){
+    const tenantInput = document.getElementById("tenantId");
+    const tenantLoadLine = document.getElementById("tenantLoadLine");
+    if (document.getElementById("demoMode").checked){
+      tenantLoadLine.textContent = "Local simulation is active.";
+      return;
+    }
+    try{
+      const response = await fetch(baseUrl() + "/tenants/first");
+      const body = await response.json();
+      if (!response.ok || !body.id) throw new Error(body.message || response.statusText || "No tenant found");
+      tenantInput.value = body.id;
+      tenantLoadLine.textContent = "First tenant loaded from the database.";
+      tenantLoadLine.className = "claims-line";
+    } catch(error){
+      tenantLoadLine.textContent = "Couldn't load a tenant from the database: " + error.message;
+      tenantLoadLine.className = "claims-line error";
+    }
   }
 
   // ---------- JWT decode (display only — NOT verification; the backend
@@ -522,6 +544,7 @@
   handleCognitoCallback().catch(error => {
     authLine.textContent = "Cognito sign-in failed: " + error.message;
   });
+  loadFirstTenant();
 
   // ---------- Tenant isolation ----------
   const reportsTable = document.getElementById("reportsTable");

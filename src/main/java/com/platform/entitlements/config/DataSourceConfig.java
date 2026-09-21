@@ -1,3 +1,4 @@
+/** Builds the pooled application DataSource and wraps it with tenant-aware PostgreSQL session handling. */
 package com.platform.entitlements.config;
 
 import com.platform.entitlements.tenant.TenantAwareDataSource;

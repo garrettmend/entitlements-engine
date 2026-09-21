@@ -1,3 +1,4 @@
+-- Creates the initial tenants and reports tables that form the application's baseline schema.
 -- Baseline schema: tenants + one example protected resource (reports).
 -- Every tenant-owned table in this system MUST have a NOT NULL tenant_id
 -- column with an RLS policy applied in V2. Adding a new table without

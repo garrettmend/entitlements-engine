@@ -1,3 +1,4 @@
+/** Stores and clears the current tenant ID in a thread-local request context. */
 package com.platform.entitlements.tenant;
 
 /**

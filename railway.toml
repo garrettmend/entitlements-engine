@@ -1,3 +1,4 @@
+# Configures Railway to build with the Dockerfile and deploy with health checks and restart retries.
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"

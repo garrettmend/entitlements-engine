@@ -1,3 +1,4 @@
+/** Defines the tenant-owned JPA entity stored in the reports table. */
 package com.platform.entitlements.domain;
 
 import jakarta.persistence.*;

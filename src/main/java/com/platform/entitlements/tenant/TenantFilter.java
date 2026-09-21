@@ -1,3 +1,4 @@
+/** Loads tenant identity for protected HTTP requests and always clears it afterward. */
 package com.platform.entitlements.tenant;
 
 import jakarta.servlet.FilterChain;
@@ -45,14 +46,14 @@ public class TenantFilter extends OncePerRequestFilter {
     private boolean requiresTenant(HttpServletRequest request) {
         // Public/health endpoints don't need a tenant.
         String path = request.getRequestURI();
-        return !(path.equals("/") || path.equals("/index.html")
+        return !(path.equals("/") || path.equals("/index.html") || path.equals("/tenants/first")
             || path.startsWith("/actuator") || path.startsWith("/health"));
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.equals("/") || path.equals("/index.html")
+        return path.equals("/") || path.equals("/index.html") || path.equals("/tenants/first")
             || path.startsWith("/actuator") || path.startsWith("/health");
     }
 }

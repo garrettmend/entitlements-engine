@@ -1,3 +1,4 @@
+/** Records test publication calls in memory instead of contacting AWS EventBridge. */
 package com.platform.entitlements.metering;
 
 import org.springframework.context.annotation.Profile;

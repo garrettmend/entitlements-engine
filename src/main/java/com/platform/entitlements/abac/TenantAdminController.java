@@ -1,3 +1,4 @@
+/** Exposes the internal endpoint for changing a tenant's subscription tier. */
 package com.platform.entitlements.abac;
 
 import org.springframework.http.ResponseEntity;

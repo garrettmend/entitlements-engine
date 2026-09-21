@@ -1,3 +1,4 @@
+-- Repairs missing tenant, report, and metering schema objects while preserving their indexes and RLS policies.
 -- Repairs databases whose Flyway history records V3 but whose table is missing.
 
 CREATE TABLE IF NOT EXISTS tenants (

@@ -1,3 +1,4 @@
+/** Maps a cached tenant subscription tier and its expiration timestamp to a DynamoDB item. */
 package com.platform.entitlements.abac;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;

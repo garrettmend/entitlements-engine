@@ -1,3 +1,4 @@
+/** Signals that an idempotency key was reused with a different event payload. */
 package com.platform.entitlements.metering;
 
 /**
