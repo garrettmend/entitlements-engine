@@ -199,6 +199,16 @@
       <button id="compareBtn" type="button">Load both, side by side</button>
       <div class="compare-grid" id="compareGrid" style="margin-top:16px;"></div>
     </div>
+
+    <div class="form-row" style="margin-top:18px; padding-top:14px; border-top:1px dashed var(--line);">
+      <div class="field grow">
+        <label for="reportIdInput">Report ID (fail-closed check)</label>
+        <input type="text" id="reportIdInput" class="mono" placeholder="click a row id above, or paste one from another tenant">
+      </div>
+      <button id="lookupReportBtn" type="button">Look up by ID</button>
+    </div>
+    <div class="hint">Load reports as tenant A, click a row's id to copy it in, switch the tenant ID field to tenant B, then look it up — RLS 404s instead of leaking that the row exists.</div>
+    <div class="result-box" id="reportLookupResult"></div>
   </section>
 
   <!-- ================= USAGE METERING ================= -->
@@ -260,6 +270,19 @@
         <div class="perm-rule">GET /reports/export — requires Pro tier or above</div>
         <div class="btn-row"><button id="tryExportBtn" type="button">Try it</button></div>
         <div class="result-box" id="exportResult"></div>
+      </div>
+      <div class="ent-card" style="grid-column:1 / -1;">
+        <div class="perm-name">Change tenant tier (admin)</div>
+        <div class="perm-rule">PATCH /admin/tenants/{id}/subscription-tier — writes Postgres, then the entitlements cache. Change it, then re-run the two checks above with no reload.</div>
+        <div class="btn-row">
+          <select id="tierSelect" style="width:auto;">
+            <option value="FREE">FREE</option>
+            <option value="PRO">PRO</option>
+            <option value="ENTERPRISE">ENTERPRISE</option>
+          </select>
+          <button id="updateTierBtn" type="button">Update tier</button>
+        </div>
+        <div class="result-box" id="tierResult"></div>
       </div>
     </div>
   </section>
@@ -589,10 +612,20 @@
       tr.innerHTML = "<td>" + escapeHtml(r.title) + "</td>" +
         "<td class=\"id mono\">" + escapeHtml(r.createdBy || "") + "</td>" +
         "<td>" + (r.createdAt ? new Date(r.createdAt).toLocaleString() : "") + "</td>" +
-        "<td class=\"id mono\">" + ((r.id || "").slice(0,8)) + "</td>";
+        "<td class=\"id mono\" data-full-id=\"" + escapeHtml(r.id || "") + "\" title=\"" + escapeHtml(r.id || "") + " — click to copy into the lookup field below\" style=\"cursor:pointer;\">" + ((r.id || "").slice(0,8)) + "</td>";
       tbody.appendChild(tr);
     });
   }
+
+  document.addEventListener("click", event => {
+    const cell = event.target.closest("td[data-full-id]");
+    if (!cell) return;
+    const fullId = cell.getAttribute("data-full-id");
+    if (!fullId) return;
+    const lookupInput = document.getElementById("reportIdInput");
+    lookupInput.value = fullId;
+    lookupInput.focus();
+  });
 
   document.getElementById("loadReportsBtn").addEventListener("click", async () => {
     const token = tokenInput.value.trim();
@@ -636,6 +669,19 @@
     const colA = document.getElementById("colA"), colB = document.getElementById("colB");
     if (resA.ok) renderReportsInto(colA, resA.body); else colA.innerHTML = "<tr><td class=\"id\">" + escapeHtml(resA.status + " " + resA.statusText) + "</td></tr>";
     if (resB.ok) renderReportsInto(colB, resB.body); else colB.innerHTML = "<tr><td class=\"id\">" + escapeHtml(resB.status + " " + resB.statusText) + "</td></tr>";
+  });
+
+  document.getElementById("lookupReportBtn").addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    const el = document.getElementById("reportLookupResult");
+    if (!requireToken(token, el)) return;
+    const id = document.getElementById("reportIdInput").value.trim();
+    if (!id){
+      showResult(el, { ok:false, status:0, statusText:"No report ID", body:"Enter or click a report id first." });
+      return;
+    }
+    const result = await apiCall("/reports/" + encodeURIComponent(id), { method:"GET" }, token);
+    showResult(el, result);
   });
 
   // ---------- Usage metering ----------
@@ -726,6 +772,20 @@
     if (!requireToken(token, el)) return;
     const result = await apiCall("/reports/export", { method:"GET" }, token);
     showResult(el, result);
+  });
+
+  document.getElementById("updateTierBtn").addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    const el = document.getElementById("tierResult");
+    if (!requireToken(token, el)) return;
+    const tenantId = document.getElementById("tenantId").value.trim();
+    const tier = document.getElementById("tierSelect").value;
+    const result = await apiCall("/admin/tenants/" + encodeURIComponent(tenantId) + "/subscription-tier", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tier: tier }),
+    }, token);
+    showResult(el, result, result.status === 204 ? "tier set to " + tier + " — try Create report / Export data above" : null);
   });
 })();
 </script>
